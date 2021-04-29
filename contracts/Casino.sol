@@ -83,7 +83,7 @@ contract Casino {
         Position storage position = _positions[msg.sender][asset];
 
         // round up
-        uint256 price = (assetPrice * amount) + _assetDecimalDivisor - 1 / _assetDecimalDivisor;
+        uint256 price = ((assetPrice * amount) + _assetDecimalDivisor - 1) / _assetDecimalDivisor;
 
         _balances[msg.sender].sub(price, "Not enough balance to buy asset");
         _lockedBalances[msg.sender].add(price);
