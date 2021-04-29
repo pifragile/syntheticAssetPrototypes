@@ -20,7 +20,7 @@ contract Casino {
     address owner;
     uint256 public poolBalance;
     // every asset can be broken down into 1/18
-    uint256 private _assetDecimalDivisor = 10**18;
+    uint256 private _assetDecimalDivisor = 10 ** 18;
     mapping(address => uint256) private _balances;
     mapping(address => uint256) private _lockedBalances;
 
@@ -56,6 +56,12 @@ contract Casino {
         _balances[msg.sender] += msg.value;
     }
 
+    function withdrawAll() public returns (bool){
+        payable(msg.sender).transfer(_balances[msg.sender]);
+        _balances[msg.sender] = 0;
+        return true;
+    }
+
     function _payFee(address payer, uint256 amount) private {
         // round up
         uint256 fee = ((amount + 9999) / 10000) * _fee;
@@ -77,7 +83,7 @@ contract Casino {
         Position storage position = _positions[msg.sender][asset];
 
         // round up
-        uint256 price = (assetPrice * amount) + _assetDecimalDivisor - 1 /  _assetDecimalDivisor;
+        uint256 price = (assetPrice * amount) + _assetDecimalDivisor - 1 / _assetDecimalDivisor;
 
         _balances[msg.sender].sub(price, "Not enough balance to buy asset");
         _lockedBalances[msg.sender].add(price);
