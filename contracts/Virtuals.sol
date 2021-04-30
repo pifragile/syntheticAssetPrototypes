@@ -13,8 +13,6 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 contract Virtuals is ERC20 {
     using SafeMath for uint256;
 
-    mapping(address => uint256) private _balances;
-
     mapping(address => mapping(address => uint256)) private _allowances;
 
     // address -> asset -> amount
@@ -40,15 +38,18 @@ contract Virtuals is ERC20 {
         _mint(msg.sender, 10 ** decimals() * 100000000);
     }
     modifier _ownerOnly(){
-        require(msg.sender == owner);
+        require(msg.sender == owner, "you are not the owner");
         _;
     }
 
     function addOrUpdatePriceFeed(string memory asset, address priceFeedAddress) _ownerOnly public {
         AggregatorV3Interface priceFeed = AggregatorV3Interface(priceFeedAddress);
-        require(priceFeed.decimals() == 18, "invalid priceFeed");
         _priceFeeds[asset] = priceFeed;
 
+    }
+
+    function positionOf(address account, string memory asset) view public returns (uint256) {
+        return _positions[account][asset];
     }
 
     function _getPriceAndDecimals(string memory asset) view private returns (uint256, uint256){
@@ -67,8 +68,8 @@ contract Virtuals is ERC20 {
     function _payFee(address payer, uint256 amount) private {
         // round up
         uint256 fee = ((amount + 9999) / 10000) * _fee;
-        _balances[payer].sub(fee, "not enough balance to pay fee");
-        _balances[owner].add(fee);
+        require(balanceOf(payer) >= fee, "not enough balance to pay fee");
+        _transfer(payer, owner, fee);
     }
 
     /**
@@ -76,7 +77,7 @@ contract Virtuals is ERC20 {
     * Calculates the price of amount assetWei in VRTWei.
     * If it will become clear that _assetDecimals == _decimals, this calculation could be simplified a little.
     */
-    function _getAssetPriceInVRT(string memory asset, uint256 amount) private view  returns (uint256){
+    function _getAssetPriceInVRT(string memory asset, uint256 amount) private view returns (uint256){
         (uint256 assetPrice, uint256 assetPriceDecimals) = _getPriceAndDecimals(asset);
         (uint256 VRTPrice, uint256 VRTPriceDecimals) = _getVRTPriceAndDecimals();
 
@@ -92,7 +93,7 @@ contract Virtuals is ERC20 {
         uint256 denominator = VRTPrice * 10 ** assetPriceDecimals * 10 ** _assetDecimals;
 
         // round up
-        uint256 price = numerator + denominator - 1 / denominator;
+        uint256 price = (numerator + denominator - 1) / denominator;
         return price;
     }
 
@@ -101,12 +102,12 @@ contract Virtuals is ERC20 {
         uint256 price = _getAssetPriceInVRT(asset, amount);
         _burn(msg.sender, price);
         _payFee(msg.sender, price);
-        _positions[msg.sender][asset].add(amount);
+        _positions[msg.sender][asset] = _positions[msg.sender][asset].add(amount);
     }
 
     function sell(string memory asset, uint256 amount) public {
         uint256 price = _getAssetPriceInVRT(asset, amount);
-        _positions[msg.sender][asset].sub(amount, "not enough assets to sell");
+        _positions[msg.sender][asset] = _positions[msg.sender][asset].sub(amount, "not enough assets to sell");
         _payFee(msg.sender, price);
         _mint(msg.sender, price);
     }
